@@ -1,5 +1,3 @@
-!pip install transformers
-
 import argparse
 import torch
 from transformers import BertTokenizer
@@ -360,11 +358,12 @@ def main():
         "--model_output", default=None, type=str, required=True, help="The directory to save model."
     )
     parser.add_argument(
-        "--model_start", default=None, type=str, required=True, help="If want to train from existing model"
+        "--model_start", default=None, type=str, help="If want to train from existing model"
     )
     parser.add_argument(
-        "--model_prediction", default=None, type=str, required=True, help="Store the prediction"
+        "--model_prediction", default=None, type=str, help="Store the prediction"
     )
+    args = parser.parse_args()
 
     df = read_online_query(args.data_path)
     df, NUM_LABELS = preprocessing(df, args.min_each_group, args.maxlength)   # preprocessed
