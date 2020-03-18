@@ -51,7 +51,7 @@ def bootstrap(data, fraction):
     # This function will be applied on each group of instances of the same
     # class in data.
     def sampleClass(classgroup):
-        return classgroup.sample(frac = fraction, seed = 1)
+        return classgroup.sample(frac = fraction, random_state = 1)
 
     samples = data.groupby('index').apply(sampleClass)
     
@@ -158,7 +158,7 @@ def create_mini_batch(samples):
 def output_split(df, fraction = 0.7):
     df_train = bootstrap(df, fraction)
     df_remain = pd.concat([df_train, df]).drop_duplicates(keep=False)
-    df_val = df_remain.sample(frac = 0.5, seed = 1)
+    df_val = df_remain.sample(frac = 0.5, random_state = 1)
     df_test = pd.concat([df_val, df_remain]).drop_duplicates(keep=False)
     del df_remain
 
