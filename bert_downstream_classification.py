@@ -333,7 +333,20 @@ def write_prediction(output_dir, pred):
     print("Saving prediction to %s" % os.path.join(output_dir, "prediction.txt"))
     with open(os.path.join(output_dir, "prediction.txt"), 'w') as opt:
         opt.write('%s' % pred)
-        
+
+def predict(model_path, data_path, BATCH_SIZE):
+    PRETRAINED_MODEL_NAME = model_path
+    # 取得此預訓練模型所使用的 tokenizer
+    tokenizer = BertTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)
+    clear_output()
+    df = read_online_query(data_path)
+    
+    testset = getOnlineQueryDataset("test", df, tokenizer)
+    testloader = DataLoader(testset, batch_size=BATCH_SIZE, 
+                        collate_fn=create_mini_batch)
+    predictions = get_predictions(model, testloader).detach().cpu().numpy()
+    return predictions
+
 def main():
     parser = argparse.ArgumentParser()
 
@@ -353,6 +366,9 @@ def main():
     parser.add_argument(
         "--maxlength", default=30, type=int
     )
+    
+    parser.add_argument("--do_test", action="store_false", help="Whether it is a test run")
+    
 #     parser.add_argument(
 #         "--seed", default=30, type=int
 #     )
@@ -366,7 +382,15 @@ def main():
         "--model_prediction", default=None, type=str, help="Store the prediction"
     )
     args = parser.parse_args()
-
+    
+    if args.do_test == True:
+        if not args.model_start:
+            print("In test mode, you should provide the model to evaluate.")
+            return
+        pred = predict(args.model_start, args.data_path, args.batch_size)
+        write_prediction(args.model_prediction, pred)
+        return
+    
     df = read_online_query(args.data_path)
     df, NUM_LABELS = preprocessing(df, args.min_each_group, args.maxlength)   # preprocessed
     
