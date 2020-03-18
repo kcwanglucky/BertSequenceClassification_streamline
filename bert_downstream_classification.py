@@ -338,6 +338,9 @@ def predict(model_path, data_path, BATCH_SIZE):
     PRETRAINED_MODEL_NAME = model_path
     # 取得此預訓練模型所使用的 tokenizer
     tokenizer = BertTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)
+    model = BertForSequenceClassification.from_pretrained(
+        PRETRAINED_MODEL_NAME)
+    
     clear_output()
     df = read_online_query(data_path)
     
