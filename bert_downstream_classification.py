@@ -367,7 +367,7 @@ def main():
         "--maxlength", default=30, type=int
     )
     
-    parser.add_argument("--do_test", action="store_false", help="Whether it is a test run")
+    parser.add_argument("--do_test", action="store_true", help="Whether it is a test run")
     
 #     parser.add_argument(
 #         "--seed", default=30, type=int
