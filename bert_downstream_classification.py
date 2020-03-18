@@ -395,8 +395,9 @@ def main():
     model = train(trainloader, valloader, PRETRAINED_MODEL_NAME, NUM_LABELS, args.epoch)
     save_model(args, args.model_output, model, tokenizer)
     
+    predictions = get_predictions(model, testloader).detach().cpu().numpy()
+    
     if args.model_prediction:
-        predictions = get_predictions(model, testloader).detach().cpu().numpy()
         write_prediction(args.model_prediction, predictions)
 
     if 'index' in testset.df:      # If we have labels on test set, we can calculate the accuracy
