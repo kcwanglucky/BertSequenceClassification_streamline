@@ -125,8 +125,6 @@ class OnlineQueryDataset(Dataset):
 - label_ids       : (batch_size)
 它會對前兩個 tensors 作 zero padding，並產生前面說明過的 masks_tensors
 """
-from torch.utils.data import DataLoader
-from torch.nn.utils.rnn import pad_sequence
 
 def create_mini_batch(samples):
     tokens_tensors = [s[0] for s in samples]
@@ -174,6 +172,7 @@ def read_online_query(path):
 
 def getOnlineQueryDataset(mode, df, tokenizer):
     return OnlineQueryDataset(mode, df, tokenizer)
+
 def get_predictions(model, dataloader, compute_acc=False):
     predictions = None
     correct = 0
@@ -313,7 +312,7 @@ def train(trainloader, valloader, model_name, num_label, epochs):
 def plain_accuracy(label, pred):
     return (label == pred).sum().item()/len(label)
 
-def save_model(output_dir, model, tokenizer):
+def save_model(args, output_dir, model, tokenizer):
     # Create output directory if needed
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -369,7 +368,7 @@ def main():
     df, NUM_LABELS = preprocessing(df, args.min_each_group, args.maxlength)   # preprocessed
     
     df_train, df_val, df_test = output_split(df, 0.7)
-
+    
     PRETRAINED_MODEL_NAME = "bert-base-chinese"
     # 取得此預訓練模型所使用的 tokenizer
     tokenizer = BertTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)
@@ -394,7 +393,7 @@ def main():
         PRETRAINED_MODEL_NAME = args.model_start
     
     model = train(trainloader, valloader, PRETRAINED_MODEL_NAME, NUM_LABELS, args.epoch)
-    save_model(args.model_output, model, tokenizer)
+    save_model(args, args.model_output, model, tokenizer)
     
     predictions = get_predictions(model, testloader).detach().cpu().numpy()
     write_prediction(args.model_prediction, predictions)
