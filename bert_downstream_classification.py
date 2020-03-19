@@ -51,7 +51,7 @@ def bootstrap(data, fraction):
     # This function will be applied on each group of instances of the same
     # class in data.
     def sampleClass(classgroup):
-        return classgroup.sample(frac = fraction, random_state = 1)
+        return classgroup.sample(frac = fraction, random_state = 5)
 
     samples = data.groupby('index').apply(sampleClass)
     
@@ -158,7 +158,7 @@ def create_mini_batch(samples):
 def output_split(df, fraction = 0.7):
     df_train = bootstrap(df, fraction)
     df_remain = pd.concat([df_train, df]).drop_duplicates(keep=False)
-    df_val = df_remain.sample(frac = 0.5, random_state = 1)
+    df_val = df_remain.sample(frac = 0.5, random_state = 5)
     df_test = pd.concat([df_val, df_remain]).drop_duplicates(keep=False)
     del df_remain
 
@@ -327,10 +327,10 @@ def save_model(args, output_dir, model, tokenizer):
     # Good practice: save your training arguments together with the trained model
     torch.save(args, os.path.join(output_dir, 'training_args.bin'))
     
-def write_prediction(output_dir, pred):
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    print("Saving prediction to %s" % os.path.join(output_dir, "prediction.txt"))
+def write_prediction(output_name, pred):
+    if not os.path.exists("prediction"):
+        os.makedirs("prediction")
+    print("Saving prediction to %s" % os.path.join("prediction", output_name, ".txt"))
     with open(os.path.join(output_dir, "prediction.txt"), 'w') as opt:
         opt.write('%s' % pred)
 
@@ -381,9 +381,9 @@ def main():
     parser.add_argument(
         "--model_start", default=None, type=str, help="If want to train from existing model"
     )
-    parser.add_argument(
-        "--model_prediction", default=None, type=str, help="Store the prediction"
-    )
+    # parser.add_argument(
+    #     "--model_prediction", default=None, type=str, help="Store the prediction"
+    # )
     args = parser.parse_args()
     
     if args.do_test == True:
@@ -428,7 +428,7 @@ def main():
     predictions = get_predictions(model, testloader).detach().cpu().numpy()
     
     if args.model_prediction:
-        write_prediction(args.model_prediction, predictions)
+        write_prediction(args.model_output, predictions)
 
     if 'index' in testset.df:      # If we have labels on test set, we can calculate the accuracy
         # 用分類模型預測測試集
