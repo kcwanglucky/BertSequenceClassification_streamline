@@ -10,12 +10,13 @@ from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 
-# 把各組數量大於mineachgroup的及Question長度小於maxlength的取出來
-# 然後再轉換index，讓被刪除的index不要留空 Output一個更新後的dataframe
-def filter_toofew_toolong(df_data, mineachgroup, maxlength):
-    df_data = df_data[~(df_data.question.apply(lambda x : len(x)) > maxlength)]
+def filter_toofew_toolong(df, mineachgroup, maxlength):
+    """把各組數量大於mineachgroup的及Question長度小於maxlength的取出來
+    然後再轉換index，讓被刪除的index不要留空 Output一個更新後的dataframe
+    """
+    df = df[~(df.question.apply(lambda x : len(x)) > maxlength)]
 
-    counts = df_data["index"].value_counts()
+    counts = df["index"].value_counts()
     idxs = np.array(counts.index)
     
     # index numbers of groups with count >= mineachgroup
@@ -43,15 +44,17 @@ def preprocessing(df, mineachgroup, maxlength):
     print("label的數量：{}".format(num_labels))
     return df, num_labels
 
-""" 從各類別random sample出fraction比例的資料集
-    data: df data that includes the "index" and "question" column
-    fraction: the fraction of data you want to sample (ex: 0.7)
-""" 
 def bootstrap(data, fraction):
-    # This function will be applied on each group of instances of the same
-    # class in data.
+    """從各類別 random sample 出 fraction 比例的資料集
+    Args:    
+        data: df data that includes the "index" and "question" column
+        fraction: the fraction of data you want to sample (ex: 0.7)
+    """ 
     def sampleClass(classgroup):
-        return classgroup.sample(frac = fraction, random_state = 5)
+        """This function will be applied on each group of instances of the same
+        class in data
+        """
+        return classgroup.sample(frac = fraction)
 
     samples = data.groupby('index').apply(sampleClass)
     
@@ -60,20 +63,23 @@ def bootstrap(data, fraction):
     samples.index = samples.index.get_level_values(1)
     return samples
 
-"""
+class OnlineQueryDataset(Dataset):
+    """
     實作一個可以用來讀取訓練 / 測試集的 Dataset，此 Dataset 每次將 tsv 裡的一筆成對句子
     轉換成 BERT 相容的格式，並回傳 3 個 tensors：
     - tokens_tensor：兩個句子合併後的索引序列，包含 [CLS] 與 [SEP]
     - segments_tensor：可以用來識別兩個句子界限的 binary tensor
     - label_tensor：將分類標籤轉換成類別索引的 tensor, 如果是測試集則回傳 None
-"""
-class OnlineQueryDataset(Dataset):
-    # mode: in ["train", "test", "val"]
-    # tokenizer: one of bert tokenizer
-    # perc: percentage of data to put in training set
-    # path: if given, then read df from the path(ex training set)
+    """
     def __init__(self, mode, df, tokenizer, path = None):
-        assert mode in ["train", "val", "test"]  # 一般訓練你會需要 dev set
+        """
+        Args:
+            mode: in ["train", "test", "val"]
+            tokenizer: one of bert tokenizer
+            perc: percentage of data to put in training set
+            path: if given, then read df from the path(ex training set)
+        """
+        assert mode in ["train", "val", "test"]
         self.mode = mode
 
         if path: 
@@ -83,9 +89,9 @@ class OnlineQueryDataset(Dataset):
         self.len = len(self.df)
         self.tokenizer = tokenizer 
     
-    # 定義回傳一筆訓練 / 測試數據的函式
     #@pysnooper.snoop()  # 加入以了解所有轉換過程
     def __getitem__(self, idx):
+        """定義回傳一筆訓練 / 測試數據的函式"""
         if self.mode == "test":
             text = self.df.iloc[idx, 1]
             label_tensor = None
@@ -114,19 +120,20 @@ class OnlineQueryDataset(Dataset):
     
     def __len__(self):
         return self.len
-    
-"""
-實作可以一次回傳一個 mini-batch 的 DataLoader
-這個 DataLoader 吃我們上面定義的 OnlineQueryDataset，
-回傳訓練 BERT 時會需要的 4 個 tensors：
-- tokens_tensors  : (batch_size, max_seq_len_in_batch)
-- segments_tensors: (batch_size, max_seq_len_in_batch)
-- masks_tensors   : (batch_size, max_seq_len_in_batch)
-- label_ids       : (batch_size)
-它會對前兩個 tensors 作 zero padding，並產生前面說明過的 masks_tensors
-"""
 
 def create_mini_batch(samples):
+    """
+    實作可以一次回傳一個 mini-batch 的 DataLoader
+    這個 DataLoader 吃我們上面定義的 OnlineQueryDataset，
+    回傳訓練 BERT 時會需要的 4 個 tensors
+    它會對前兩個 tensors 作 zero padding，並產生前面說明過的 masks_tensors
+    Returns:
+        tokens_tensors  : (batch_size, max_seq_len_in_batch)
+        segments_tensors: (batch_size, max_seq_len_in_batch)
+        masks_tensors   : (batch_size, max_seq_len_in_batch)
+        label_ids       : (batch_size)
+    """
+
     tokens_tensors = [s[0] for s in samples]
     segments_tensors = [s[1] for s in samples]
     
@@ -147,15 +154,13 @@ def create_mini_batch(samples):
     
     return tokens_tensors, segments_tensors, masks_tensors, label_ids
 
-""" 將原本全部的cleaned data依照指定的比例分成train/val/test set，
-    並output成tsv檔到環境中(檔名ex: 70%train.tsv)
-    df: df data that includes the "index" and "question" column
-    fraction: fraction of all data to be assigned to training set
-    The remaining (1-fraction) data will be equally splitted between
-    validation and testing set
-"""
-
 def output_split(df, fraction = 0.7):
+    """將原本全部的cleaned data依照指定的比例分成train/val/test set，
+    並output成tsv檔到環境中(檔名ex: 70%train.tsv)
+    Args:
+        df: df data that includes the "index" and "question" column
+        fraction: fraction of all data to be assigned to training set
+    """
     df_train = bootstrap(df, fraction)
     df_remain = pd.concat([df_train, df]).drop_duplicates(keep=False)
     df_val = df_remain.sample(frac = 0.5, random_state = 5)
@@ -169,9 +174,6 @@ def output_split(df, fraction = 0.7):
 
 def read_online_query(path):
     return pd.read_csv(path)
-
-def getOnlineQueryDataset(mode, df, tokenizer):
-    return OnlineQueryDataset(mode, df, tokenizer)
 
 def get_predictions(model, dataloader, compute_acc=False):
     predictions = None
@@ -344,7 +346,7 @@ def predict(model_path, data_path, BATCH_SIZE):
     clear_output()
     df = read_online_query(data_path)
     
-    testset = getOnlineQueryDataset("test", df, tokenizer)
+    testset = OnlineQueryDataset("test", df, tokenizer)
     testloader = DataLoader(testset, batch_size=BATCH_SIZE, 
                         collate_fn=create_mini_batch)
     predictions = get_predictions(model, testloader).detach().cpu().numpy()
@@ -405,9 +407,9 @@ def main():
     clear_output()
     
     # 初始化一個專門讀取訓練樣本的 Dataset，使用中文 BERT 斷詞
-    trainset = getOnlineQueryDataset("train", df_train, tokenizer)
-    valset = getOnlineQueryDataset("val", df_val, tokenizer)
-    testset = getOnlineQueryDataset("test", df_test, tokenizer)
+    trainset = OnlineQueryDataset("train", df_train, tokenizer)
+    valset = OnlineQueryDataset("val", df_val, tokenizer)
+    testset = OnlineQueryDataset("test", df_test, tokenizer)
 
     # 初始化一個每次回傳 64 個訓練樣本的 DataLoader
     # 利用 collate_fn 將 list of samples 合併成一個 mini-batch
