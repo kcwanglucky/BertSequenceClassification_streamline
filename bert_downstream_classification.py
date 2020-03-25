@@ -23,8 +23,8 @@ def filter_toofew_toolong(df, mineachgroup, maxlength):
     list_idx = [i for i, c in zip(idxs, counts) if c > mineachgroup]
 
     # filter out data with "index" in list_idx 
-    df_data = df_data[df_data["index"].isin(list_idx)]
-    return df_data
+    df = df[df["index"].isin(list_idx)]
+    return df
 
 def reindex(df):
     index = df['index']
