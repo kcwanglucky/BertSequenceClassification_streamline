@@ -99,10 +99,11 @@ def preprocess_app_comment(path, verbose = False):
         DataFrame: The DataFrame with only relevant data
     """
     df_all = pd.read_excel(path)
-    df_all.rename(columns={"評論內容": "question", "類別": "index"}, inplace = True)
+    df_all.rename(columns={"評論標題":"title", "評論內容": "question", "類別": "index"}, inplace = True)
     df_all.dropna(axis = 0, how = 'any', subset=["question", "index"], inplace = True)
     if verbose:
         print(df_all['index'].value_counts())
+    df_all['question'] = df_all['tilte'].astype(str)+' '+df['question'].astype(str)
     df_all = df_all.loc[:, ["index", "question"]]       # get 'index' and 'question' coluumn
     return df_all
 
