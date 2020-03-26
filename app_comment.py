@@ -81,6 +81,7 @@ class AppCommentData():
         return OnlineQueryDataset(self.mode, self.df_reindex, self.tokenizer)
 
     def get_dataloader(self):
+        """Return a dataloader that can be fed to """
         shuffle = True if self.mode == "train" else False
         return DataLoader(self.get_dataset(), batch_size=self.batch_size, shuffle = shuffle,  
                             collate_fn=create_mini_batch)

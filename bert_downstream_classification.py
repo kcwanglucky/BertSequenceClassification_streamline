@@ -173,6 +173,9 @@ def output_split(df, fraction = 0.7):
 def read_online_query(path):
     return pd.read_csv(path)
 
+def getOnlineQueryDataset(mode, df, tokenizer):
+    return OnlineQueryDataset(mode, df, tokenizer)
+
 def get_predictions(model, dataloader, compute_acc=False):
     predictions = None
     correct = 0
