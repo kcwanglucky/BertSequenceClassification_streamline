@@ -6,13 +6,14 @@ import torch
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
+from sklearn.model_selection import train_test_split
 from BertSequenceClassification_streamline.bert_downstream_classification import *
 
 class AppCommentData():
     def __init__(self, df, mode, tokenizer = None, batch_size = None):
         """
         Args:
-            mode: in ["train", "test", "val"]
+            mode: in ["train", "test", "val", "all"]
             tokenizer: one of bert tokenizer
             perc: percentage of data to put in training set
             path: if given, then read df from the path(ex training set)
@@ -22,7 +23,7 @@ class AppCommentData():
         self.tokenizer = tokenizer
         self.batch_size = batch_size
 
-    def get_index2label():
+    def get_index2label(self):
         """
         Return:
             A dictionary {class_index: class_label}
@@ -31,29 +32,29 @@ class AppCommentData():
         index2label = {idx:val for idx, val in enumerate(index.unique())}
         return index2label
 
-    def get_num_index():
-        return len(self.index2label)
+    def get_num_index(self):
+        return len(self.get_index2label())
 
-    def get_index_dist(verbose = False):
+    def get_index_dist(self, verbose = False):
         """得到此 dataframe 的訓練分布 (分類:筆數) return the mapping of value and occurrence
            df: "pd.DataFrame" type
         """
         each_count = self.df['index'].value_counts()
         if verbose:
-            print("所有 data 各類分布: \n")
+            print(self.mode + " data 各類分布: \n")
             for index in each_count.index:
                 print("{:15} 數量: {}".format(index, each_count[index] ))
         return each_count
 
-    def plot_pie():
+    def plot_pie(self, fontprop):
         plt.figure(figsize=(10, 10), facecolor="w")
         index_dist = self.get_index_dist()
 
-        plt.title("{}set Distribution ({} data)".format(mode, sum(self.index_dist)), fontsize=16)
+        plt.title("{} data Distribution ({} data)".format(self.mode, sum(index_dist)), fontsize=16)
         patches,l_text, p_text = plt.pie(index_dist, autopct="%1.1f%%",
                                         textprops = {"fontsize" : 12}, labeldistance=1.05)
         for i, t in enumerate(l_text): 
-            t.set_text(self.index_dist.index[i])
+            t.set_text(index_dist.index[i])
             t.set_fontproperties(fontprop)
             #t.set_color('red')
             pct = float(p_text[i].get_text().strip('%'))
@@ -62,10 +63,10 @@ class AppCommentData():
             #p_text[i].set_color('red')
         plt.show()
 
-    def get_dataset():
+    def get_dataset(self):
         return OnlineQueryDataset(self.mode, self.df, self.tokenizer)
 
-    def get_dataloader():
+    def get_dataloader(self):
         shuffle = True if self.mode == "train" else False
         return DataLoader(self.get_dataset(), batch_size=self.batch_size, shuffle = shuffle,  
                             collate_fn=create_mini_batch)
@@ -107,20 +108,8 @@ def preprocess_app_comment(path, verbose = False):
 #             print("{:15} 數量: {}".format(index2label[idx], each_count[idx] ))
 #     return each_count
 
-def let_colab_print_chinese():
-    """Download the required font to print chinese characters on plots created by matplotlib
-    Returns:
-        FontProperties: when provide it as an argument to plt.plot graphs,
-                        chinese character can be displayed
-    """
-    !wget "https://noto-website-2.storage.googleapis.com/pkgs/NotoSansCJKkr-hinted.zip"
-    !unzip "NotoSansCJKkr-hinted.zip"
-    !mv NotoSansCJKkr-Medium.otf /usr/share/fonts/truetype/
-    path = '/usr/share/fonts/truetype/NotoSansCJKkr-Medium.otf'
-    fontprop = fm.FontProperties(fname=path, size= 12)
-    return fontprop
 
-def train_val_test_split(df, train_size):
+def train_val_test_split(df, train_size = 0.75):
     train, test = train_test_split(
         df, train_size=train_size)
     # train, val = train_test_split(
@@ -322,102 +311,6 @@ def df2binary(df):
     df['index'] = df['index'].apply(lambda x: 1 if x == '稱讚' else 0)
     return df
 
-# df = preprocess_app_comment("20190508起APP評論.xlsx")
-# df = df.loc[:, ["index", "question"]]       # get 'index' and 'question' coluumn
-# df = filter_toofew_toolong(df, args.min_each_group, args.maxlength)
-df_bin = change2binary(df)
-# index = df_binary['index']
-# index2label = {idx:val for idx, val in enumerate(index.unique())}
-# num_index = len(index2label)
-df_bin_train, df_bin_val, df_bin_test = train_val_test_split(df_bin)
-app_bin_train = AppCommentData(f_bin_train, "train", tokenizer, 64)
-
-# investigate test set
-app_bin_val = AppCommentData(df_bin_val, "val", tokenizer, 64)
-app_bin_test = AppCommentData(df_bin_test, "test", tokenizer, 64)
-
-trainloader = app_bin_train.get_dataloader()
-valloader = app_bin_val.get_dataloader()
-testloader = app_bin_test.get_dataloader()
-
-
-# if args.model_start:    # If model_start is provided, then initialize model with the existing model
-#     PRETRAINED_MODEL_NAME = args.model_start
-model = train(trainloader, valloader, PRETRAINED_MODEL_NAME, num_labels, args.epoch)
-save_model(args, args.model_output, model, tokenizer)
-
-# testing
-predictions = get_predictions(model, testloader).detach().cpu().numpy()
-
-# Presentation
-true_label = app_test.df["index"]
-class_matrix, false_group = get_confusion_matrix(true_label, predictions, num_labels)
-print_acc("測試集 Accuracy: ", class_matrix)
-
-label_list = [index2label[key] for key in index2label]
-label2index = {val:key for key, val in index2label.items()}
-summary = pd.DataFrame(class_matrix, dtype = int, columns=label_list, index = label_list)
-print("測試集 confusion matrix:")
-summary
-
 """(2) Multiclass classification on non-compliment comments."""
 def df_without_bin(df):
     return df[df['index'] != '稱讚']
-
-# df = preprocess_app_comment("20190508起APP評論.xlsx")
-# df = df.loc[:, ["index", "question"]]       # get 'index' and 'question' coluumn
-# df = filter_toofew_toolong(df, args.min_each_group, args.maxlength)
-
-df_other = df_without_bin(df)
-# index = df_other['index']
-# index2label = {idx:val for idx, val in enumerate(index.unique())}
-# num_index = len(index2label)
-df_other_train, df_other_val, df_other_test = train_val_test_split(df_other)
-app_other_train = AppCommentData(df_other_train, "train", tokenizer, 64)
-
-# investigate test set
-app_other_val = AppCommentData(df_other_val, "val", tokenizer, 64)
-app_other_test = AppCommentData(df_other_test, "test", tokenizer, 64)
-
-trainloader = app_bin_train.get_dataloader()
-valloader = app_bin_val.get_dataloader()
-testloader = app_bin_test.get_dataloader()
-
-# if args.model_start:    # If model_start is provided, then initialize model with the existing model
-#     PRETRAINED_MODEL_NAME = args.model_start
-model = train(trainloader, valloader, PRETRAINED_MODEL_NAME, num_labels, args.epoch)
-save_model(args, args.model_output, model, tokenizer)
-
-# testing
-predictions = get_predictions(model, testloader).detach().cpu().numpy()
-
-# Presentation
-true_label = app_test.df["index"]
-class_matrix, false_group = get_confusion_matrix(true_label, predictions, num_labels)
-print_acc("測試集 Accuracy: ", class_matrix)
-
-label_list = [index2label[key] for key in index2label]
-label2index = {val:key for key, val in index2label.items()}
-summary = pd.DataFrame(class_matrix, dtype = int, columns=label_list, index = label_list)
-print("測試集 confusion matrix:")
-summary
-
-
-
-
-df_map = pd.read_excel("公版評論回覆與分類表@20200313.xlsx")
-
-df_map[['子分類', '公版內容']]
-
-curr = ""
-subclass = []
-for i in range(len(df_map)):
-    string = df_map.loc[i, '子分類']
-    if string is not np.nan:
-        curr = string
-    subclass.append(curr)
-
-df_map['子分類'] = subclass
-
-len(df_map)
-
