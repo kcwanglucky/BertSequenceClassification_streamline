@@ -325,7 +325,7 @@ def save_model(args, output_dir, model, tokenizer):
     tokenizer.save_pretrained(output_dir)
 
     # Good practice: save your training arguments together with the trained model
-    torch.save(args, os.path.join(output_dir, 'training_args.bin'))
+    #torch.save(args, os.path.join(output_dir, 'training_args.bin'))
     
 def write_prediction(output_name, pred):
     if not os.path.exists("prediction"):

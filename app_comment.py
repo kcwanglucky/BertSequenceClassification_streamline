@@ -105,23 +105,13 @@ def preprocess_app_comment(path, verbose = False):
     df_all = df_all.loc[:, ["index", "question"]]       # get 'index' and 'question' coluumn
     return df_all
 
-# df = preprocess_app_comment(path, verbose = False) # path stores the raw app comment data
+def df2binary(df):
+    df_new = df.copy()
+    df_new['index'] = df_new['index'].apply(lambda x: 1 if x == '稱讚' else 0)
+    return df_new
 
-# def get_dataset_dist(mode, dataset, index2label, verbose = False):
-#     """得到此 dataset 的訓練分布 (分類:筆數)
-#        dataset: OnlineQueryDataset type
-#     """
-#     def get_index2label(i):
-#         return index2label[i]
-#     index_list = dataset.df['index'].apply(get_index2label) 
-
-#     each_count = index_list .value_counts()
-#     if verbose:
-#         print(mode + "set 各類分布: \n")
-#         for idx in each_count.index:
-#             print("{:15} 數量: {}".format(index2label[idx], each_count[idx] ))
-#     return each_count
-
+def df_without_bin(df):
+    return df[df['index'] != '稱讚']
 
 def train_val_test_split(df, train_size = 0.75):
     train, test = train_test_split(
@@ -155,30 +145,16 @@ def get_confusion_matrix(true_label, predictions, num_index):
 def print_acc(class_matrix):
     """print the accuracy given a confusion matrix"""
     total = 0
+    num_index = len(class_matrix)
     for i in range(num_index):
         total += class_matrix[i][i]
     print("Accuracy: {0}%".format(100 * total/np.sum(class_matrix)))
 
-# def print_summary_all(class_matrix, index2label, false_group):
-#     num_each_group = np.sum(class_matrix, axis = 1)
-#     for i in range(num_index):
-#         print("類別: {0} \t 測試集筆數: {1}".format(index2label[i], int(num_each_group[i]) ))
-#         print("被分類器正確分類的機率: {0} %".format(100 * class_matrix[i][i]/num_each_group[i]) )
-#         sorted_idxs = np.argsort(class_matrix[i])
-#         if sorted_idxs[-1] == i:
-#             idx = sorted_idxs[-2]
-#         else:
-#             idx = sorted_idxs[-1]
-#         if class_matrix[i][idx] != 0:
-#             print("最常被分錯的組別: {0}  筆數: {1}".format(index2label[idx], class_matrix[i][idx]) )
-#             print("錯誤分組範例: {0}".format( testset.df.iloc[false_group[i][0]]['question'] ))
-#             print("\t被分成: {0}".format(index2label[ predictions[false_group[i][0]] ] ))
-#         print()
-
-def print_summary_i(i, class_matrix, index2label, false_group, firstK = 3):
+def print_summary_i(df, i, class_matrix, index2label, false_group, predictions, firstK = 3):
     """print 出第 i 組的分類概覽
        包括所有此類的問題， 被錯誤分類成哪個組別
     Args:
+        df (Dataframe): The test data that you want to summarize
         i (int): the i-th class
         class_matrix (list of list): the confusion matrix
         index2label (dict): the class index to label mapping 
@@ -202,12 +178,11 @@ def print_summary_i(i, class_matrix, index2label, false_group, firstK = 3):
         count = 0
         for f in false_group[i]:
             if count >= firstK: break
-            print(testset.df.iloc[f]['question'])
+            print(df.iloc[f]['question'])
             print("\t被分成: {0}".format(index2label[predictions[f]]))
             count += 1
 
-"""畫出第 i 組評論的分類分佈"""
-def plot_dist(index_dist):
+def plot_dist(index_dist ,label_list, fontprop = None):
     """Plot the distribution given in index_dist
     Args:
         index_dist (list): A list of distribution
@@ -219,9 +194,8 @@ def plot_dist(index_dist):
 
     plt.figure(figsize = (10, 5), facecolor="w")
     plt.bar(x_axis, height = y_value)
-    #plt.xticks(range(num_index),('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k'))
-    plt.xticks(x_axis, y_value, fontproperties=fontprop)
-    #plt.title("原始組別: " + label_list[i], fontproperties=fontprop)
+    
+    plt.xticks(x_axis, label_list, fontproperties=fontprop)
     plt.xticks(rotation=270, fontproperties=fontprop)
     plt.xlabel("被分類的組別", fontproperties=fontprop)
     for j in range(num_index):
@@ -229,102 +203,3 @@ def plot_dist(index_dist):
         plt.text(j - 0.4, y_value[j], str(perc) + "%", color='blue', fontproperties=fontprop)
     #plt.subplot(432)
     plt.show()
-
-if __name__ == "__main__":
-    # 為了讓 colab 能 print 中文
-    fontprop = let_colab_print_chinese()
-    #fm.FontProperties(fname='/usr/share/fonts/truetype/NotoSansCJKkr-Medium.otf', size= 12)
-    args = Args()
-    path = "公版評論回覆與分類表@20200313.xlsx"
-    df = preprocess_app_comment(path, verbose = False)
-    df = filter_toofew_toolong(df, args.min_each_group, args.maxlength)
-    df.to_csv("app_comment" + "_me" + str(args.min_each_group) + "_ml" + str(args.maxlength) + ".csv")
-
-    # investigate all data
-    app_data = AppCommentData(df)
-    app_data.plot_pie()
-    app_data.get_index_dist(verbose = True)
-    num_labels = app_data.get_num_index()
-    index2label = app_data.get_index2label()
-
-    df_train, df_val, df_test = train_val_test_split(df)
-    
-
-    PRETRAINED_MODEL_NAME = "bert-base-chinese"
-    # 取得此預訓練模型所使用的 tokenizer
-    tokenizer = BertTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)
-
-    # investigate train set
-    app_train = AppCommentData(df_train, "train", tokenizer, 64)
-    app_train.plot_pie()
-
-    # investigate test set
-    app_val = AppCommentData(df_val, "val", tokenizer, 64)
-    app_test = AppCommentData(df_test, "test", tokenizer, 64)
-    app_test.plot_pie()
-    
-    trainloader = app_train.get_dataloader()
-    valloader = app_val.get_dataloader()
-    testloader = app_test.get_dataloader()
-
-    model = train(trainloader, valloader, PRETRAINED_MODEL_NAME, num_labels, args.epoch)
-    save_model(args, args.model_output, model, tokenizer)
-
-    # testing
-    predictions = get_predictions(model, testloader).detach().cpu().numpy()
-
-    # Presentation
-    true_label = app_test.df["index"]
-    class_matrix, false_group = get_confusion_matrix(true_label, predictions, num_labels)
-    print_acc("測試集 Accuracy: ", class_matrix)
-
-    label_list = [index2label[key] for key in index2label]
-    label2index = {val:key for key, val in index2label.items()}
-    summary = pd.DataFrame(class_matrix, dtype = int, columns=label_list, index = label_list)
-    print("測試集 confusion matrix:")
-    summary
-
-    # 個別檢查
-    for i in range(num_labels):
-        print_summary_i(i, class_matrix, index2label, false_group, 3)
-
-    # labels: ('未知問題','操作問題','稱讚','建議-台幣','抱怨','建議-信用卡','建議-APP','顧客疑問','系統問題-bug','第三方問題','系統問題-Keypasco')
-    i = label2index['抱怨']
-    plot_group_i(i, class_matrix)
-    plot_dist(class_matrix[i])
-    #print_summary_i(i, class_matrix, index2label)
-
-
-"""set the arguments if not using a command line """
-class Args:
-    data_path = 'all_app_comment.csv'
-    epoch = 25
-    batch_size = 64
-    min_each_group = 5                      # 每組至少要有幾筆才被放入訓練集
-    maxlength = 50                          # 若app comment評論超過此長度則刪除
-    model_output = 'model_ep25_eg5_ml50'
-    #model_start = "app_all1"
-
-"""由於 “第三方問題” “建議-台幣” “顧客疑慮” 筆數過少，利用設 "args.min_each_group" 參數來將之排除在分類器的訓練集裡。若將來有更多資料，就可重新放入訓練"""
-
-# if args.model_prediction:
-#     write_prediction(args.model_prediction, predictions)
-
-# if 'index' in testset.df:      # If we have labels on test set, we can calculate the accuracy
-#     # 用分類模型預測測試集
-#     test_label = testset.df['index']
-#     print("Testset accuracy: %f" % plain_accuracy(test_label, predictions))
-
-
-
-"""## Approach 2: Binary calssification followed by a multiclass classification on non-compliment comments
-
-(1) Binary calssification (分出稱讚以及非稱讚的評論)
-"""
-def df2binary(df):
-    df['index'] = df['index'].apply(lambda x: 1 if x == '稱讚' else 0)
-    return df
-
-"""(2) Multiclass classification on non-compliment comments."""
-def df_without_bin(df):
-    return df[df['index'] != '稱讚']
