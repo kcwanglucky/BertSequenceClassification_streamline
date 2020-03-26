@@ -15,13 +15,22 @@ class AppCommentData():
         Args:
             mode: in ["train", "test", "val", "all"]
             tokenizer: one of bert tokenizer
-            perc: percentage of data to put in training set
-            path: if given, then read df from the path(ex training set)
         """
         self.df = df
         self.mode = mode
         self.tokenizer = tokenizer
         self.batch_size = batch_size
+    
+    def reindex(self, label2index):
+        """Reindex the df given the mapping in label2index so that 
+        it can be fed to model
+        Called to reindex the train val test data to the label in "all" data
+        """
+        df_reindex = self.df.copy()
+        def getindex4label(label):
+            return label2index[label]
+        df_reindex["index"] = df_reindex["index"].apply(getindex4label)
+        self.df_reindex = df_reindex
 
     def get_index2label(self):
         """
@@ -31,6 +40,10 @@ class AppCommentData():
         index = self.df['index']
         index2label = {idx:val for idx, val in enumerate(index.unique())}
         return index2label
+
+    def get_label2index(self):
+        index2label = self.get_index2label()
+        return {lab:idx for idx, lab in index2label.items()}
 
     def get_num_index(self):
         return len(self.get_index2label())
@@ -64,7 +77,8 @@ class AppCommentData():
         plt.show()
 
     def get_dataset(self):
-        return OnlineQueryDataset(self.mode, self.df, self.tokenizer)
+        """label2index contains label to index mapping as in the all dataset"""
+        return OnlineQueryDataset(self.mode, self.df_reindex, self.tokenizer)
 
     def get_dataloader(self):
         shuffle = True if self.mode == "train" else False
