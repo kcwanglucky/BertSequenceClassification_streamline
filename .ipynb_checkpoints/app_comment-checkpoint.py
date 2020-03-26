@@ -318,6 +318,9 @@ class Args:
 
 (1) Binary calssification (分出稱讚以及非稱讚的評論)
 """
+def df2binary(df):
+    df['index'] = df['index'].apply(lambda x: 1 if x == '稱讚' else 0)
+    return df
 
 # df = preprocess_app_comment("20190508起APP評論.xlsx")
 # df = df.loc[:, ["index", "question"]]       # get 'index' and 'question' coluumn
@@ -358,6 +361,9 @@ print("測試集 confusion matrix:")
 summary
 
 """(2) Multiclass classification on non-compliment comments."""
+def df_without_bin(df):
+    return df[df['index'] != '稱讚']
+
 # df = preprocess_app_comment("20190508起APP評論.xlsx")
 # df = df.loc[:, ["index", "question"]]       # get 'index' and 'question' coluumn
 # df = filter_toofew_toolong(df, args.min_each_group, args.maxlength)
@@ -395,3 +401,23 @@ label2index = {val:key for key, val in index2label.items()}
 summary = pd.DataFrame(class_matrix, dtype = int, columns=label_list, index = label_list)
 print("測試集 confusion matrix:")
 summary
+
+
+
+
+df_map = pd.read_excel("公版評論回覆與分類表@20200313.xlsx")
+
+df_map[['子分類', '公版內容']]
+
+curr = ""
+subclass = []
+for i in range(len(df_map)):
+    string = df_map.loc[i, '子分類']
+    if string is not np.nan:
+        curr = string
+    subclass.append(curr)
+
+df_map['子分類'] = subclass
+
+len(df_map)
+
