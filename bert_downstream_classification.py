@@ -28,8 +28,7 @@ def filter_toofew_toolong(df, mineachgroup, maxlength):
 
 def reindex(df):
     index = df['index']
-    index2label = {idx:val for idx, val in enumerate(index.unique()) }
-    label2index = {val:idx for idx, val in index2label.items() }
+    label2index = {val:idx for idx, val in enumerate(index.unique())}
     def getindex4label(label):
         return label2index[label]
     df["index"] = df["index"].apply(getindex4label) 
@@ -55,7 +54,6 @@ def bootstrap(data, fraction):
         class in data
         """
         return classgroup.sample(frac = fraction)
-
     samples = data.groupby('index').apply(sampleClass)
     
     # If you want an index which is equal to the row in data where the sample came from
