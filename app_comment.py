@@ -107,19 +107,6 @@ def preprocess_app_comment(path, verbose = False):
     df_all = df_all.loc[:, ["index", "question"]]       # get 'index' and 'question' coluumn
     return df_all
 
-def let_colab_print_chinese():
-    """Download the required font to print chinese characters on plots created by matplotlib
-    Returns:
-        FontProperties: when provide it as an argument to plt.plot graphs,
-                        chinese character can be displayed
-    """
-    !wget "https://noto-website-2.storage.googleapis.com/pkgs/NotoSansCJKkr-hinted.zip"
-    !unzip "NotoSansCJKkr-hinted.zip"
-    !mv NotoSansCJKkr-Medium.otf /usr/share/fonts/truetype/
-    path = '/usr/share/fonts/truetype/NotoSansCJKkr-Medium.otf'
-    fontprop = fm.FontProperties(fname=path, size= 12)
-    return fontprop
-
 def read_preprocess_data(path):
     df = preprocess_app_comment(path, verbose = False)
     df = filter_toofew_toolong(df, args.min_each_group, args.maxlength)
