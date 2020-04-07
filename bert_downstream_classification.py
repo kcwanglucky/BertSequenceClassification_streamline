@@ -95,10 +95,10 @@ class OnlineQueryDataset(Dataset):
             text = self.df.loc[idx, "question"]
             label_tensor = None
         elif self.mode == "val":
-            label, text = self.df.iloc[idx, ["index", "question"]].values
+            label, text = self.df.loc[idx, ["index", "question"]].values
             label_tensor = torch.tensor(label)
         else:
-            label, text = self.df.iloc[idx, ["index", "question"]].values
+            label, text = self.df.loc[idx, ["index", "question"]].values
             # 將label文字也轉換成索引方便轉換成 tensor
             label_tensor = torch.tensor(label)
         
