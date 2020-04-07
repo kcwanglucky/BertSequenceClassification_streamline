@@ -78,7 +78,10 @@ class AppCommentData():
 
     def get_dataset(self):
         """label2index contains label to index mapping as in the all dataset"""
-        return OnlineQueryDataset(self.mode, self.df_reindex, self.tokenizer)
+        if mode == "test":
+            return OnlineQueryDataset(self.mode, self.df, self.tokenizer)
+        else:
+            return OnlineQueryDataset(self.mode, self.df_reindex, self.tokenizer)
 
     def get_dataloader(self):
         """Return a dataloader that can be fed to """
