@@ -92,13 +92,13 @@ class OnlineQueryDataset(Dataset):
     def __getitem__(self, idx):
         """定義回傳一筆訓練 / 測試數據的函式"""
         if self.mode == "test":
-            text = self.df.loc[idx, "question"]
+            text = self.df.iloc[idx, 1]
             label_tensor = None
         elif self.mode == "val":
-            label, text = self.df.loc[idx, ["index", "question"]].values
+            label, text = self.df.iloc[idx, :].values
             label_tensor = torch.tensor(label)
         else:
-            label, text = self.df.loc[idx, ["index", "question"]].values
+            label, text = self.df.iloc[idx, :].values
             # 將label文字也轉換成索引方便轉換成 tensor
             label_tensor = torch.tensor(label)
         
