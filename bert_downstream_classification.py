@@ -20,7 +20,7 @@ def filter_toofew_toolong(df, mineachgroup, maxlength):
     idxs = np.array(counts.index)
     
     # index numbers of groups with count >= mineachgroup
-    list_idx = [i for i, c in zip(idxs, counts) if c > mineachgroup]
+    list_idx = [i for i, c in zip(idxs, counts) if c >= mineachgroup]
 
     # filter out data with "index" in list_idx 
     df = df[df["index"].isin(list_idx)]
@@ -36,6 +36,7 @@ def reindex(df):
 
 def preprocessing(df, mineachgroup, maxlength):
     df = df.loc[:, ["index", "question"]]       # get 'index' and 'question' coluumn
+    df = df.drop_duplicates()
     df = filter_toofew_toolong(df, mineachgroup, maxlength)
     df = reindex(df)
 
