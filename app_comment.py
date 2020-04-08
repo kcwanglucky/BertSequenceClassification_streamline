@@ -117,9 +117,9 @@ def preprocess(path, args):
     """ preprocess_app_comment + append_question_title + filter_toofew_toolong
     """
     df = preprocess_app_comment(path, verbose = False)
+    df = filter_toofew_toolong(df, args.min_each_group, args.maxlength)
     df = append_question_title(df)
     df = df.loc[:, ["index", "question"]]       # get 'index' and 'question' coluumn
-    df = filter_toofew_toolong(df, args.min_each_group, args.maxlength)
     return df
 
 def df2binary(df):
