@@ -10,23 +10,25 @@ from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 
-def filter_toofew_toolong(df, mineachgroup, maxlength):
-    """把各組數量大於mineachgroup的及Question長度小於maxlength的取出來
-    然後再轉換index，讓被刪除的index不要留空 Output一個更新後的dataframe
+def filter_toofew_toolong(df, min_each_group, max_length):
+    """ Filter out groups with data fewer than min_each_group and filter 
+    out data longer than max_length
     """
-    df = df[~(df.question.apply(lambda x : len(x)) > maxlength)]
+    df = df[~(df.question.apply(lambda x : len(x)) > max_length)]
 
     counts = df["index"].value_counts()
     idxs = np.array(counts.index)
     
     # index numbers of groups with count >= mineachgroup
-    list_idx = [i for i, c in zip(idxs, counts) if c >= mineachgroup]
+    list_idx = [i for i, c in zip(idxs, counts) if c >= min_each_group]
 
     # filter out data with "index" in list_idx 
     df = df[df["index"].isin(list_idx)]
     return df
 
 def reindex(df):
+    """reindex the label to be starting from 0
+    """
     index = df['index']
     label2index = {val:idx for idx, val in enumerate(index.unique())}
     def getindex4label(label):
@@ -74,6 +76,7 @@ class OnlineQueryDataset(Dataset):
         """
         Args:
             mode: in ["train", "test", "val"]
+            df: first column - label; second column - question
             tokenizer: one of bert tokenizer
             perc: percentage of data to put in training set
             path: if given, then read df from the path(ex training set)
@@ -213,146 +216,158 @@ def get_predictions(model, dataloader, compute_acc=False):
         return predictions, acc
     return predictions
 
-def train(trainloader, valloader, model_name, num_label, epochs):
-    model = BertForSequenceClassification.from_pretrained(
-        model_name, num_labels=num_label)
-    clear_output()
-    
-    # 讓模型跑在 GPU 上並取得訓練集的分類準確率
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    print("device:", device)
-    model = model.to(device)
-    pred, acc = get_predictions(model, trainloader, compute_acc=True)
-    
-    # 使用 Adam Optim 更新整個分類模型的參數
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
+class model():
+    def __init__(self, df_cleaned, model_name):
+        self.df_cleaned = df_cleaned
 
-    for epoch in range(epochs):
+        app_data = AppCommentData(df_cleaned, "train", tokenizer, 64)
+        self.num_label = app_data.get_num_index()
+        self.index2label = app_data.get_index2label()
+        self.model = BertForSequenceClassification.from_pretrained(
+                    model_name, num_labels=num_label)
+        self.tokenizer = BertTokenizer.from_pretrained(model_name)
+
+    def get_num_label():
+        return self.num_label
+
+    def get_index2label():
+        return self.index2label
+
+    def train(trainloader, valloader, epochs):
         
-        running_loss = 0.0
-        print("")
-        print('======== Epoch {:} / {:} ========'.format(epoch + 1, epochs))
-        print('Training...')
+        # 讓模型跑在 GPU 上並取得訓練集的分類準確率
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        print("device:", device)
+        model = self.model.to(device)
+        pred, acc = get_predictions(model, trainloader, compute_acc=True)
+        
+        # 使用 Adam Optim 更新整個分類模型的參數
+        optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
 
-        # 訓練模式
-        model.train()
-
-        for data in trainloader: # trainloader is an iterator over each batch
-            tokens_tensors, segments_tensors, \
-            masks_tensors, labels = [t.to(device) for t in data]
-
-            # 將參數梯度歸零
-            optimizer.zero_grad()
+        for epoch in range(epochs):
             
-            # forward pass
-            outputs = model(input_ids=tokens_tensors, 
-                            token_type_ids=segments_tensors, 
-                            attention_mask=masks_tensors, 
-                            labels=labels)
+            running_loss = 0.0
+            print("")
+            print('======== Epoch {:} / {:} ========'.format(epoch + 1, epochs))
+            print('Training...')
 
-            loss = outputs[0]
-            # backward
-            loss.backward()
+            # 訓練模式
+            model.train()
 
-            # Clip the norm of the gradients to 1.0.
-            # This is to help prevent the "exploding gradients" problem.
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            optimizer.step()
+            for data in trainloader: # trainloader is an iterator over each batch
+                tokens_tensors, segments_tensors, \
+                masks_tensors, labels = [t.to(device) for t in data]
 
-            # 紀錄當前 batch loss
-            running_loss += loss.item()
-            
-        # 計算分類準確率
-        logit, acc = get_predictions(model, trainloader, compute_acc=True)
+                # 將參數梯度歸零
+                optimizer.zero_grad()
+                
+                # forward pass
+                outputs = model(input_ids=tokens_tensors, 
+                                token_type_ids=segments_tensors, 
+                                attention_mask=masks_tensors, 
+                                labels=labels)
 
-        print('loss: %.3f, acc: %.3f' % (running_loss, acc))    
-        print("")
-        print("Running Validation...")
+                loss = outputs[0]
+                # backward
+                loss.backward()
 
-        # # Put the model in evaluation mode--the dropout layers behave differently
-        # # during evaluation.
-        # model.eval()
+                # Clip the norm of the gradients to 1.0.
+                # This is to help prevent the "exploding gradients" problem.
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                optimizer.step()
 
-        # # Evaluate data for one epoch
-        # for data in valloader:
-        #     tokens_tensors, segments_tensors, \
-        #     masks_tensors, labels = [t.to(device) for t in data]
-            
-        #     # Telling the model not to compute or store gradients, saving memory and
-        #     # speeding up validation
-        #     with torch.no_grad():
-        #         # Forward pass, calculate logit predictions.
-        #         # This will return the logits rather than the loss because we have
-        #         # not provided labels.
-        #         # token_type_ids is the same as the "segment ids", which 
-        #         # differentiates sentence 1 and 2 in 2-sentence tasks.
-        #         outputs = model(input_ids=tokens_tensors, 
-        #                     token_type_ids=segments_tensors, 
-        #                     attention_mask=masks_tensors, 
-        #                     labels=labels)
-            
-        #     # Get the "logits" output by the model. The "logits" are the output
-        #     # values prior to applying an activation function like the softmax.
-        #     logits = outputs[0]
+                # 紀錄當前 batch loss
+                running_loss += loss.item()
+                
+                # 計算分類準確率
+            logit, acc = get_predictions(model, trainloader, compute_acc=True)
 
-        _, acc = get_predictions(model, valloader, compute_acc=True)
-        # Move logits and labels to CPU
-        #logits = logits.detach().cpu().numpy()
-        #label_ids = b_labels.to('cpu').numpy()
+            print('loss: %.3f, acc: %.3f' % (running_loss, acc))    
+            print("")
+            print("Running Validation...")
 
-        # Calculate the accuracy for this batch of test sentences.
-        # tmp_eval_accuracy = flat_accuracy(logits, label_ids)
+            # # Put the model in evaluation mode--the dropout layers behave differently
+            # # during evaluation.
+            # model.eval()
 
-        # Accumulate the total accuracy.
-        #eval_accuracy += tmp_eval_accuracy
+            # # Evaluate data for one epoch
+            # for data in valloader:
+            #     tokens_tensors, segments_tensors, \
+            #     masks_tensors, labels = [t.to(device) for t in data]
+                
+            #     # Telling the model not to compute or store gradients, saving memory and
+            #     # speeding up validation
+            #     with torch.no_grad():
+            #         # Forward pass, calculate logit predictions.
+            #         # This will return the logits rather than the loss because we have
+            #         # not provided labels.
+            #         # token_type_ids is the same as the "segment ids", which 
+            #         # differentiates sentence 1 and 2 in 2-sentence tasks.
+            #         outputs = model(input_ids=tokens_tensors, 
+            #                     token_type_ids=segments_tensors, 
+            #                     attention_mask=masks_tensors, 
+            #                     labels=labels)
+                
+            #     # Get the "logits" output by the model. The "logits" are the output
+            #     # values prior to applying an activation function like the softmax.
+            #     logits = outputs[0]
 
-        # Track the number of batches
-        #nb_eval_steps += 1
+            _, acc = get_predictions(model, valloader, compute_acc=True)
+            # Move logits and labels to CPU
+            #logits = logits.detach().cpu().numpy()
+            #label_ids = b_labels.to('cpu').numpy()
 
-        # Report the final accuracy for this validation run.
-        print("  Accuracy: {0:.2f}".format(acc))
-    return model
+            # Calculate the accuracy for this batch of test sentences.
+            # tmp_eval_accuracy = flat_accuracy(logits, label_ids)
 
-def plain_accuracy(label, pred):
-    return (label == pred).sum().item()/len(label)
+            # Accumulate the total accuracy.
+            #eval_accuracy += tmp_eval_accuracy
 
-def save_model(args, output_dir, model, tokenizer):
-    # Create output directory if needed
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+            # Track the number of batches
+            #nb_eval_steps += 1
 
-    print("Saving model to %s" % output_dir)
-    # Save a trained model, configuration and tokenizer using 'save_pretrained()'.
-    # They can then be reloaded using 'from_pretrained()'
-    model_to_save = model.module if hasattr(model, 'module') else model  # Take care of distributed/parallel training
-    model_to_save.save_pretrained(output_dir)
-    tokenizer.save_pretrained(output_dir)
+            # Report the final accuracy for this validation run.
+            print("  Accuracy: {0:.2f}".format(acc))
+        self.model = model
+        return model
 
-    # Good practice: save your training arguments together with the trained model
-    #torch.save(args, os.path.join(output_dir, 'training_args.bin'))
-    
-def write_prediction(output_name, pred):
+    def save_model(args, output_dir, tokenizer):
+        # Create output directory if needed
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        print("Saving model to %s" % output_dir)
+        # Save a trained model, configuration and tokenizer using 'save_pretrained()'.
+        # They can then be reloaded using 'from_pretrained()'
+        model = self.model
+        model_to_save = model.module if hasattr(model, 'module') else model  # Take care of distributed/parallel training
+        model_to_save.save_pretrained(output_dir)
+        tokenizer.save_pretrained(output_dir)
+
+        # Good practice: save your training arguments together with the trained model
+        #torch.save(args, os.path.join(output_dir, 'training_args.bin'))
+
+    def predict(testloader):
+        clear_output()
+        df = self.df_cleaned
+        model = self.model
+
+        testset = OnlineQueryDataset("test", df, tokenizer)
+        testloader = DataLoader(testset, batch_size=BATCH_SIZE, 
+                            collate_fn=create_mini_batch)
+        predictions = get_predictions(model, testloader).detach().cpu().numpy()
+        self.predict = predictions
+        return predictions
+
+def write_prediction(pred, output_name):
     if not os.path.exists("prediction"):
         os.makedirs("prediction")
     print("Saving prediction to %s" % os.path.join("prediction", output_name, ".txt"))
-    with open(os.path.join(output_dir, "prediction.txt"), 'w') as opt:
+    with open(os.path.join("prediction", output_name, ".txt"), 'w') as opt:
         opt.write('%s' % pred)
 
-def predict(model_path, data_path, BATCH_SIZE):
-    PRETRAINED_MODEL_NAME = model_path
-    # 取得此預訓練模型所使用的 tokenizer
-    tokenizer = BertTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)
-    model = BertForSequenceClassification.from_pretrained(
-        PRETRAINED_MODEL_NAME)
-    
-    clear_output()
-    df = read_online_query(data_path)
-    
-    testset = OnlineQueryDataset("test", df, tokenizer)
-    testloader = DataLoader(testset, batch_size=BATCH_SIZE, 
-                        collate_fn=create_mini_batch)
-    predictions = get_predictions(model, testloader).detach().cpu().numpy()
-    return predictions
+def plain_accuracy(label, pred):
+    return (label == pred).sum().item()/len(label)
 
 def main():
     parser = argparse.ArgumentParser()

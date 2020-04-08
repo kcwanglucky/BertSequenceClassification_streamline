@@ -106,9 +106,14 @@ def preprocess_app_comment(path, verbose = False):
     df_all.dropna(axis = 0, how = 'any', subset=["question", "index"], inplace = True)
     if verbose:
         print(df_all['index'].value_counts())
-    #df_all['question'] = df_all['title'].astype(str)+' '+ df_all['question'].astype(str)
+    df_all = df_all.fillna('')
+    df_all = append_question_title(df_all)
+
     df_all = df_all.loc[:, ["index", "question"]]       # get 'index' and 'question' coluumn
     return df_all
+
+def append_question_title(df):
+    df['question'] = df['title']+ df['question'].astype(str)
 
 def read_preprocess_data(path):
     df = preprocess_app_comment(path, verbose = False)
