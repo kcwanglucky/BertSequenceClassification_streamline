@@ -355,12 +355,8 @@ class Model():
         #torch.save(args, os.path.join(output_dir, 'training_args.bin'))
     def predict(self, testloader):
         clear_output()
-        df = self.df
         model = self.model
 
-        testset = OnlineQueryDataset("test", df, self.tokenizer)
-        testloader = DataLoader(testset, batch_size=BATCH_SIZE, 
-                            collate_fn=create_mini_batch)
         predictions = get_predictions(model, testloader).detach().cpu().numpy()
         self.predict = predictions
         return predictions
