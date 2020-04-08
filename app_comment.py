@@ -113,7 +113,7 @@ def append_question_title(df):
     df['question'] = df['title']+ df['question'].astype(str)
     return df
 
-def preprocess(path):
+def preprocess(path, args):
     """ preprocess_app_comment + append_question_title + filter_toofew_toolong
     """
     df = preprocess_app_comment(path, verbose = False)
