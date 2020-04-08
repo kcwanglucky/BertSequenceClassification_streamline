@@ -338,7 +338,7 @@ class Model():
         self.model = model
         return model
 
-    def save_model(self, args, output_dir, tokenizer):
+    def save_model(self, output_dir):
         # Create output directory if needed
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
@@ -349,7 +349,7 @@ class Model():
         model = self.model
         model_to_save = model.module if hasattr(model, 'module') else model  # Take care of distributed/parallel training
         model_to_save.save_pretrained(output_dir)
-        tokenizer.save_pretrained(output_dir)
+        self.tokenizer.save_pretrained(output_dir)
 
         # Good practice: save your training arguments together with the trained model
         #torch.save(args, os.path.join(output_dir, 'training_args.bin'))
@@ -358,7 +358,7 @@ class Model():
         df = self.df
         model = self.model
 
-        testset = OnlineQueryDataset("test", df, tokenizer)
+        testset = OnlineQueryDataset("test", df, self.tokenizer)
         testloader = DataLoader(testset, batch_size=BATCH_SIZE, 
                             collate_fn=create_mini_batch)
         predictions = get_predictions(model, testloader).detach().cpu().numpy()
