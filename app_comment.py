@@ -114,6 +114,7 @@ def preprocess_app_comment(path, verbose = False):
 
 def append_question_title(df):
     df['question'] = df['title']+ df['question'].astype(str)
+    return df
 
 def read_preprocess_data(path):
     df = preprocess_app_comment(path, verbose = False)
