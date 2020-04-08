@@ -26,25 +26,33 @@ def filter_toofew_toolong(df, min_each_group, max_length):
     df = df[df["index"].isin(list_idx)]
     return df
 
-def reindex(df):
+def reindex(df, label2index):
     """reindex the label to be starting from 0
     """
-    index = df['index']
-    label2index = {val:idx for idx, val in enumerate(index.unique())}
     def getindex4label(label):
         return label2index[label]
     df["index"] = df["index"].apply(getindex4label) 
     return df
 
+def create_label2index(df):
+    index = df['index']
+    label2index = {val:idx for idx, val in enumerate(index.unique())}
+    return label2index
+
+def create_index2label(df):
+    index = df['index']
+    index2label = {idx: val for idx, val in enumerate(index.unique())}
+    return index2label
+
 def preprocessing(df, mineachgroup, maxlength):
-    df = df.loc[:, ["index", "question"]]       # get 'index' and 'question' coluumn
+    df = df.loc[:, ["index", "question"]]       # get 'index' and 'question' column
     df = df.drop_duplicates()
     df = filter_toofew_toolong(df, mineachgroup, maxlength)
-    df = reindex(df)
+    return df
 
+def get_num_labels(df):
     num_labels = len(df['index'].value_counts())
-    print("label的數量：{}".format(num_labels))
-    return df, num_labels
+    return num_labels
 
 def bootstrap(data, fraction):
     """從各類別 random sample 出 fraction 比例的資料集
@@ -216,19 +224,18 @@ def get_predictions(model, dataloader, compute_acc=False):
         return predictions, acc
     return predictions
 
-class model():
-    def __init__(self, df_cleaned, model_name):
-        self.df_cleaned = df_cleaned
+class Model():
+    def __init__(self, df, model_name):
+        self.df = df
 
-        app_data = AppCommentData(df_cleaned, "train", tokenizer, 64)
-        self.num_label = app_data.get_num_index()
-        self.index2label = app_data.get_index2label()
+        self.num_labels = get_num_labels(df)
+        self.index2label = create_index2label(df)
         self.model = BertForSequenceClassification.from_pretrained(
-                    model_name, num_labels=num_label)
+                    model_name, num_labels = self.num_labels)
         self.tokenizer = BertTokenizer.from_pretrained(model_name)
 
     def get_num_label():
-        return self.num_label
+        return self.num_labels
 
     def get_index2label():
         return self.index2label
@@ -346,7 +353,6 @@ class model():
 
         # Good practice: save your training arguments together with the trained model
         #torch.save(args, os.path.join(output_dir, 'training_args.bin'))
-
     def predict(testloader):
         clear_output()
         df = self.df_cleaned
@@ -414,8 +420,12 @@ def main():
         return
     
     df = read_online_query(args.data_path)
-    df, NUM_LABELS = preprocessing(df, args.min_each_group, args.maxlength)   # preprocessed
-    
+    df = preprocessing(df, args.min_each_group, args.maxlength)   # preprocessed
+    label2index = create_label2index(df)
+
+    df = reindex(df, label2index)
+    num_labels = get_num_labels(df)
+
     df_train, df_val, df_test = output_split(df, 0.7)
     
     PRETRAINED_MODEL_NAME = "bert-base-chinese"
@@ -441,7 +451,7 @@ def main():
     if args.model_start:    # If model_start is provided, then initialize model with the existing model
         PRETRAINED_MODEL_NAME = args.model_start
     
-    model = train(trainloader, valloader, PRETRAINED_MODEL_NAME, NUM_LABELS, args.epoch)
+    model = train(trainloader, valloader, PRETRAINED_MODEL_NAME, num_labels, args.epoch)
     save_model(args, args.model_output, model, tokenizer)
     
     predictions = get_predictions(model, testloader).detach().cpu().numpy()
