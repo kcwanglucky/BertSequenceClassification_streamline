@@ -240,7 +240,7 @@ class Model():
     def get_index2label():
         return self.index2label
 
-    def train(trainloader, valloader, epochs):
+    def train(self, trainloader, valloader, epochs):
         
         # 讓模型跑在 GPU 上並取得訓練集的分類準確率
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -338,7 +338,7 @@ class Model():
         self.model = model
         return model
 
-    def save_model(args, output_dir, tokenizer):
+    def save_model(self, args, output_dir, tokenizer):
         # Create output directory if needed
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
@@ -353,9 +353,9 @@ class Model():
 
         # Good practice: save your training arguments together with the trained model
         #torch.save(args, os.path.join(output_dir, 'training_args.bin'))
-    def predict(testloader):
+    def predict(self, testloader):
         clear_output()
-        df = self.df_cleaned
+        df = self.df
         model = self.model
 
         testset = OnlineQueryDataset("test", df, tokenizer)
