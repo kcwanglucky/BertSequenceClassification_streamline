@@ -189,6 +189,16 @@ def getOnlineQueryDataset(mode, df, tokenizer):
     return OnlineQueryDataset(mode, df, tokenizer)
 
 def get_predictions(model, dataloader, compute_acc=False):
+    """ Use the given "model" to make predictions on the "dataloader"
+    Args:
+        model: a pytorch BertForSequenceClassification model
+        dataloader: the dataloader to make prediction
+        compute_acc: whether to output accuracy score
+    Returns:
+        predictions (list): The classification result
+        acc: The accuracy score
+    """
+
     predictions = None
     correct = 0
     total = 0
@@ -292,46 +302,8 @@ class Model():
             print('loss: %.3f, acc: %.3f' % (running_loss, acc))    
             print("")
             print("Running Validation...")
-
-            # # Put the model in evaluation mode--the dropout layers behave differently
-            # # during evaluation.
-            # model.eval()
-
-            # # Evaluate data for one epoch
-            # for data in valloader:
-            #     tokens_tensors, segments_tensors, \
-            #     masks_tensors, labels = [t.to(device) for t in data]
-                
-            #     # Telling the model not to compute or store gradients, saving memory and
-            #     # speeding up validation
-            #     with torch.no_grad():
-            #         # Forward pass, calculate logit predictions.
-            #         # This will return the logits rather than the loss because we have
-            #         # not provided labels.
-            #         # token_type_ids is the same as the "segment ids", which 
-            #         # differentiates sentence 1 and 2 in 2-sentence tasks.
-            #         outputs = model(input_ids=tokens_tensors, 
-            #                     token_type_ids=segments_tensors, 
-            #                     attention_mask=masks_tensors, 
-            #                     labels=labels)
-                
-            #     # Get the "logits" output by the model. The "logits" are the output
-            #     # values prior to applying an activation function like the softmax.
-            #     logits = outputs[0]
-
+            
             _, acc = get_predictions(model, valloader, compute_acc=True)
-            # Move logits and labels to CPU
-            #logits = logits.detach().cpu().numpy()
-            #label_ids = b_labels.to('cpu').numpy()
-
-            # Calculate the accuracy for this batch of test sentences.
-            # tmp_eval_accuracy = flat_accuracy(logits, label_ids)
-
-            # Accumulate the total accuracy.
-            #eval_accuracy += tmp_eval_accuracy
-
-            # Track the number of batches
-            #nb_eval_steps += 1
 
             # Report the final accuracy for this validation run.
             print("  Accuracy: {0:.2f}".format(acc))
